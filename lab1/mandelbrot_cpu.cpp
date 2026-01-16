@@ -42,27 +42,28 @@ void mandelbrot_cpu_scalar(uint32_t img_size, uint32_t max_iters, uint32_t *out)
 
 void mandelbrot_cpu_vector(uint32_t img_size, uint32_t max_iters, uint32_t *out) {
     for (uint64_t i = 0; i < img_size; ++i) {
-        for (uint64_t j = 0; j < img_size; j += 16) {
+        for (uint64_t j = 0; j < img_size; j += 8) {
             // Get the plane coordinate X for the image pixel.
             // float cx = (float(j) / float(img_size)) * 2.5f - 2.0f;
-            __m512 offsets = _mm512_set_ps(15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0);
-            __m512 js = _mm512_add_ps(_mm512_set1_ps(float(j)), offsets);
-            __m512 cxs = _mm512_sub_ps(_mm512_mul_ps(js, _mm512_set1_ps(2.5f / float(img_size))),
-                                       _mm512_set1_ps(2.0f));
+            __m256 offsets = _mm256_set_ps(7, 6, 5, 4, 3, 2, 1, 0);
+            __m256 js = _mm256_add_ps(_mm256_set1_ps(float(j)), offsets);
+            __m256 cxs = _mm256_sub_ps(_mm256_mul_ps(js, _mm256_set1_ps(2.5f / float(img_size))),
+                                       _mm256_set1_ps(2.0f));
 
             float cy = (float(i) / float(img_size)) * 2.5f - 1.25f;
-            __m512 cys = _mm512_set1_ps(cy);
+            __m256 cys = _mm256_set1_ps(cy);
 
             // Innermost loop: start the recursion from z = 0.
             // float x2 = 0.0f;
-            __m512 x2s = _mm512_set1_ps(0.0f);
+            __m256 x2s = _mm256_set1_ps(0.0f);
             // float y2 = 0.0f;
-            __m512 y2s = _mm512_set1_ps(0.0f);
+            __m256 y2s = _mm256_set1_ps(0.0f);
             // float w = 0.0f;
-            __m512 ws = _mm512_set1_ps(0.0f);
+            __m256 ws = _mm256_set1_ps(0.0f);
             // uint32_t iters = 0;
-            __m512i iters = _mm512_set1_epi32(0);
-            
+            // __m256i iters = _mm256_set1_epi32(0);
+            __m256 iters = _mm256_set1_ps(0.0f); // to avoid cvtepi32_ps conversion
+
             // while (x2 + y2 <= 4.0f && iters < max_iters) {
             //     float x = x2 - y2 + cx;
             //     float y = w - x2 - y2 + cy;
@@ -72,32 +73,34 @@ void mandelbrot_cpu_vector(uint32_t img_size, uint32_t max_iters, uint32_t *out)
             //     w = z * z;
             //     ++iters;
             // }
-            __m512 x2s_plus_y2 = _mm512_add_ps(x2s, y2s);
-            __mmask16 lte_4_mask = _mm512_cmp_ps_mask(x2s_plus_y2, _mm512_set1_ps(4.0f), _CMP_LE_OS);
-            __mmask16 lt_max_iters_mask = _mm512_cmplt_epi32_mask(iters, _mm512_set1_epi32(max_iters));
-            __mmask16 cond = lte_4_mask & lt_max_iters_mask;
-            
-            while (cond != 0) {
-                __m512 xs = _mm512_add_ps(_mm512_sub_ps(x2s, y2s), cxs);
-                __m512 ys = _mm512_add_ps(_mm512_sub_ps(_mm512_sub_ps(ws, x2s), y2s), cys);
-                x2s = _mm512_mul_ps(xs, xs);
-                y2s = _mm512_mul_ps(ys, ys);
-                __m512 zs = _mm512_add_ps(xs, ys);
-                ws = _mm512_mul_ps(zs, zs);
+            __m256 x2s_plus_y2 = _mm256_add_ps(x2s, y2s);
+            __m256 lte_4_mask = _mm256_cmp_ps(x2s_plus_y2, _mm256_set1_ps(4.0f), _CMP_LE_OS);
+            // __m256 lt_max_iters_mask = _mm256_cmp_ps(_mm256_cvtepi32_ps(iters), _mm256_set1_ps((float) max_iters), _CMP_LT_OS);
+            __m256 lt_max_iters_mask = _mm256_cmp_ps(iters, _mm256_set1_ps((float) max_iters), _CMP_LT_OS);
+            __m256 cond = _mm256_and_ps(lte_4_mask, lt_max_iters_mask);
+
+            while (_mm256_movemask_ps(cond) != 0) { // movemask gets the most significant bit and converts vector to a bitmask
+                __m256 xs = _mm256_add_ps(_mm256_sub_ps(x2s, y2s), cxs);
+                __m256 ys = _mm256_add_ps(_mm256_sub_ps(_mm256_sub_ps(ws, x2s), y2s), cys);
+                x2s = _mm256_mul_ps(xs, xs);
+                y2s = _mm256_mul_ps(ys, ys);
+                __m256 zs = _mm256_add_ps(xs, ys);
+                ws = _mm256_mul_ps(zs, zs);
 
                 // selectively update iters based on condition mask
-                iters = _mm512_mask_add_epi32(iters, cond, iters, _mm512_set1_epi32(1));
+                __m256i iters_plus_one = _mm256_add_epi32(iters, _mm256_set1_epi32(1));
+                iters = _mm256_blendv_epi8(iters, iters_plus_one, _mm256_castps_si256(cond));
 
                 // update condition mask
-                x2s_plus_y2 = _mm512_add_ps(x2s, y2s);
-                lte_4_mask = _mm512_cmp_ps_mask(x2s_plus_y2, _mm512_set1_ps(4.0f), _CMP_LE_OS);
-                lt_max_iters_mask = _mm512_cmplt_epi32_mask(iters, _mm512_set1_epi32(max_iters));
-                cond = lte_4_mask & lt_max_iters_mask;
+                x2s_plus_y2 = _mm256_add_ps(x2s, y2s);
+                lte_4_mask = _mm256_cmp_ps(x2s_plus_y2, _mm256_set1_ps(4.0f), _CMP_LE_OS);
+                lt_max_iters_mask = _mm256_cmp_ps(_mm256_cvtepi32_ps(iters), _mm256_set1_ps((float)max_iters), _CMP_LT_OS);
+                cond = _mm256_and_ps(lte_4_mask, lt_max_iters_mask);
             }
-            
+
             // Write result.
             // out[i * img_size + j] = iters;
-            _mm512_storeu_si512(&out[i * img_size + j], iters);
+            _mm256_storeu_si256((__m256i*)&out[i * img_size + j], iters);
         }
     }
 }

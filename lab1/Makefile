@@ -1,15 +1,14 @@
 CXX = clang++
-CXXFLAGS = -std=c++17 -march=x86-64 -O3
-ARCH = arch -x86_64
+CXXFLAGS = -std=c++17 -march=native -mavx2 -O3
 
 all: mandelbrot
 
 mandelbrot: mandelbrot_cpu.cpp
 	mkdir -p out
-	$(ARCH) $(CXX) $(CXXFLAGS) -o $@ $<
+	$(CXX) $(CXXFLAGS) -o $@ $<
 
 run: mandelbrot
-	$(ARCH) ./mandelbrot
+	./mandelbrot
 
 clean:
 	rm -f mandelbrot
