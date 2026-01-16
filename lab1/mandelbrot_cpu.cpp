@@ -41,7 +41,57 @@ void mandelbrot_cpu_scalar(uint32_t img_size, uint32_t max_iters, uint32_t *out)
 /// <--- your code here --->
 
 void mandelbrot_cpu_vector(uint32_t img_size, uint32_t max_iters, uint32_t *out) {
-    // TODO: Implement this function.
+    for (uint64_t i = 0; i < img_size; ++i) {
+        for (uint64_t j = 0; j < img_size / 16; j += 16) {
+            // Get the plane coordinate X for the image pixel.
+            // float cx = (float(j) / float(img_size)) * 2.5f - 2.0f;
+            __m512 offsets = _mm512_set_ps(15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0);
+            __m512 js = _mm512_add_ps(_mm512_set1_ps(float(j)), offsets);
+            __m512 cxs = _mm512_sub_ps(_mm512_mul_ps(js, _mm512_set1_ps(2.5f / float(img_size))),
+                                       _mm512_set1_ps(2.0f));
+
+            float cy = (float(i) / float(img_size)) * 2.5f - 1.25f;
+            __m512 cys = _mm512_set1_ps(cy);
+
+            // Innermost loop: start the recursion from z = 0.
+            // float x2 = 0.0f;
+            __m512 x2s = _mm512_set1_ps(0.0f);
+            // float y2 = 0.0f;
+            __m512 y2s = _mm512_set1_ps(0.0f);
+            // float w = 0.0f;
+            __m512 ws = _mm512_set1_ps(0.0f);
+            // uint32_t iters = 0;
+            __m512 iters = _mm512_set1_epi32(0);
+            
+            // while (x2 + y2 <= 4.0f && iters < max_iters) {
+            //     float x = x2 - y2 + cx;
+            //     float y = w - x2 - y2 + cy;
+            //     x2 = x * x;
+            //     y2 = y * y;
+            //     float z = x + y;
+            //     w = z * z;
+            //     ++iters;
+            // }
+            __m512 x2s_plus_y2 = _mm512_add_ps(x2s, y2s);
+            __mmask16 lte_4_mask = _mm512_cmp_ps_mask(x2s_plus_y2, _mm512_set1_ps(4.0f), _CMP_LE_OS);
+            __mmask16 lt_max_iters_mask = _mm512_cmp_ps_mask(iters, _mm512_set1_epi32(max_iters), _CMP_LT_OS);
+            __mmask16 cond = lte_4_mask & lt_max_iters_mask;
+            while (cond < 0xffff) {
+                __m512 xs = _mm512_add_ps(_mm512_sub_ps(x2s, y2s), cxs);
+                __m512 ys = _mm512_add_ps(_mm512_sub_ps(_mm512_sub_ps(ws, x2s), y2s), cys);
+                x2s = _mm512_mul_ps(xs, xs);
+                y2s = _mm512_mul_ps(ys, ys);
+                __m512 zs = _mm512_add_ps(xs, ys);
+                __m512 ws = _mm512_mul_ps(zs, zs);
+                // selectively update iters based on condition mask
+                iters = _mm512_mask_add_epi32(iters, cond, iters, _mm512_set1_epi32(1));
+            }
+            
+            // Write result.
+            // out[i * img_size + j] = iters;
+            _mm512_storeu_si512(&out[i * img_size + j], iters);
+        }
+    }
 }
 
 /// <--- /your code here --->
