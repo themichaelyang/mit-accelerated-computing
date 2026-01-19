@@ -4,7 +4,7 @@ Code for 6.S894 [Lab 1](https://accelerated-computing-class.github.io/fall24/lab
 
 > How does the run time of the scalar GPU implementation compare to the scalar CPU implementation? What factors do you think might contribute to each of their run times?
 
-The scalar GPU implementation has a slower runtime than the scalar CPU implementation. I assume this is due to the added cost of copying memory into the GPU, while still having comparable compute times.
+The scalar GPU implementation has a slower runtime than the scalar CPU implementation. I assume this is due to the added cost of copying memory into the GPU and launching the kernel, while still having comparable compute times. 
 
 > How did you initialize cx and cy? How did you handle differences in the number of inner loop iterations between pixels in the same vector? How does the performance of your vectorized implementation compare to the scalar versions?
 
@@ -13,6 +13,10 @@ I initialized `cx` and `cy` as vectors (`cxs` and `cys`). I used a bitwise mask 
 AVX2 handles 32 bytes, and each float/integer is 4 bytes, so vectorization should give a theoretical 32/4 = 8x speedup.
 
 The actual performance is about 7x faster.
+
+> How does the performance of your vectorized implementation compare to the scalar versions? Given how you implemented the vector-parallel CPU version with explicit SIMD, how do you think the GPU executes multiple kernel instances that run different numbers of iterations?
+
+Both vectorized implementations are significantly faster. I believe the GPU version executes in a similar fashion as the CPU version, executing the same instruction on the data and dropping data that isnt used based on the condition (which is why branch-prediction and reducing branching is important for GPU implementations).
 
 # CPU
 
