@@ -88,19 +88,19 @@ void mandelbrot_cpu_vector(uint32_t img_size, uint32_t max_iters, uint32_t *out)
                 ws = _mm256_mul_ps(zs, zs);
 
                 // selectively update iters based on condition mask
-                __m256i iters_plus_one = _mm256_add_epi32(iters, _mm256_set1_epi32(1));
-                iters = _mm256_blendv_epi8(iters, iters_plus_one, _mm256_castps_si256(cond));
+                __m256 add = _mm256_and_ps(cond, _mm256_set1_ps(1.0f));
+                iters = _mm256_add_ps(iters, add);
 
                 // update condition mask
                 x2s_plus_y2 = _mm256_add_ps(x2s, y2s);
                 lte_4_mask = _mm256_cmp_ps(x2s_plus_y2, _mm256_set1_ps(4.0f), _CMP_LE_OS);
-                lt_max_iters_mask = _mm256_cmp_ps(_mm256_cvtepi32_ps(iters), _mm256_set1_ps((float)max_iters), _CMP_LT_OS);
+                lt_max_iters_mask = _mm256_cmp_ps(iters, _mm256_set1_ps((float)max_iters), _CMP_LT_OS);
                 cond = _mm256_and_ps(lte_4_mask, lt_max_iters_mask);
             }
 
             // Write result.
             // out[i * img_size + j] = iters;
-            _mm256_storeu_si256((__m256i*)&out[i * img_size + j], iters);
+            _mm256_storeu_si256((__m256i*)&out[i * img_size + j], _mm256_cvtps_epi32(iters));
         }
     }
 }

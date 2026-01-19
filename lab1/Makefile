@@ -2,14 +2,14 @@ all: cpu gpu
 
 # -mavx2
 # enables avx2
-cpu: mandelbrot_cpu.cpp
+mandelbrot_cpu: mandelbrot_cpu.cpp	
 	mkdir -p out
-	clang++ -std=c++17 -march=native -mavx2 -O3 -o $@ $<
+	g++ -std=c++17 -march=native -mavx2 -O3 -o $@ $<
 
 # $ nvidia-smi --query-gpu=compute_cap --format=csv
 # 6.1
 # So using -arch=sm_61 (streaming multiprocessing version 6.1)
-gpu: mandelbrot_gpu.cu
+mandelbrot_gpu: mandelbrot_gpu.cu
 	mkdir -p out
 	nvcc -O3 -arch=sm_61 -o $@ $<
 
