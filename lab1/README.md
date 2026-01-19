@@ -14,7 +14,7 @@ AVX2 handles 32 bytes, and each float/integer is 4 bytes, so vectorization shoul
 
 The actual performance is about 7x faster.
 
-# AVX2 vectorization
+# CPU
 
 Used AVX2 since my cluster didn't have AVX-512. AVX2 is similar but supports 256-bit (32 bytes) operations instead of 512-bit (64 bytes), and less convenient masking operations.
 
@@ -34,7 +34,7 @@ Running mandelbrot_cpu_vector ...
   Correctness: average output difference from reference = 0
 ```
 
-# GPU scalar
+# GPU
 
 ```
 $ nvidia-smi --query-gpu=compute_cap --format=csv
@@ -55,6 +55,9 @@ $ make run_gpu
 ./mandelbrot_gpu
 Testing with image size 256x256 and 1000 max iterations.
 Running launch_mandelbrot_gpu_scalar ...
-  Runtime: 1217.06 ms
+  Runtime: 1235.93 ms
   Correctness: average output difference from reference = 0
+Running launch_mandelbrot_gpu_vector ...
+  Runtime: 57.9646 ms
+  Correctness: average output difference from reference 0
 ```
